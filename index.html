@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>森林翻转棋 · 双技能对决</title>
+    <title>森林翻转棋 · 火焰引爆</title>
     <style>
         * {
             box-sizing: border-box;
@@ -508,7 +508,7 @@
         </div>
         <button class="btn-reset" id="resetBtn">↻ 重开</button>
     </div>
-    <div class="message-box" id="messageBox">🌳 双方都有技能 · 公平对决</div>
+    <div class="message-box" id="messageBox">🌳 双方都有技能 · 火焰引爆</div>
 </div>
 
 <div class="help-overlay" id="helpOverlay">
@@ -557,6 +557,7 @@
             SWAP_SKILL_THRESHOLD: 5,
             AI_SKILL_THRESHOLD: 4,
             AI_SKILL_CHANCE: 0.6,
+            EXPLOSION_ANIMATION_DURATION: 1500,
         };
         // =============================================
 
@@ -600,10 +601,11 @@
         let skillAvailable = false;
         let skillTriggered = false;
         let chainActive = false;
+        let explosionAnimationActive = false;
 
         let swapSkillAvailable = false;
         let swapAnimating = false;
-        let swapAnimatingAI = false;      // AI交换动画标记
+        let swapAnimatingAI = false;
 
         let aiSkillAvailable = false;
         let aiSkillTriggered = false;
@@ -626,6 +628,9 @@
         let aiRevengeActive = false;
         let aiRevengeRemaining = 0;
 
+        let fireEmojiCells = [];
+        let fireAnimationTimer = null;
+
         const forestEmojis = ['🌲', '🌳', '🌴', '🌵', '🌱', '🌿', '☘️', '🍀', '🌺', '🌸', '🌷', '🌹', '🌻', '🌼', '💐', '🌸', '🌾', '🍃', '🌰', '🌲', '🌳', '🌴'];
         let decorationMap = {};
 
@@ -637,6 +642,111 @@
             } else {
                 return { name: '第二关 · 标准', aiRandomRate: 0.35, aiDepth: 2, aiWeightScale: 1.0, aiDelay: 1000 };
             }
+        }
+
+        // ---------- 火焰表情动画 ----------
+        function showFireEmoji(cells, callback) {
+            if (explosionAnimationActive) {
+                if (callback) callback();
+                return;
+            }
+            explosionAnimationActive = true;
+            fireEmojiCells = cells;
+            drawBoardWithFire();
+            
+            if (fireAnimationTimer) {
+                clearTimeout(fireAnimationTimer);
+                fireAnimationTimer = null;
+            }
+            fireAnimationTimer = setTimeout(function() {
+                fireEmojiCells = [];
+                explosionAnimationActive = false;
+                fireAnimationTimer = null;
+                drawBoard();
+                if (callback) callback();
+            }, CONFIG.EXPLOSION_ANIMATION_DURATION);
+        }
+
+        function drawBoardWithFire() {
+            const size = 500;
+            const cellSize = size / SIZE;
+            ctx.clearRect(0, 0, size, size);
+            ctx.fillStyle = '#d9b382';
+            ctx.fillRect(0, 0, size, size);
+            ctx.strokeStyle = '#8b6b4a';
+            ctx.lineWidth = 1.8;
+            for (let i=0; i<=SIZE; i++) {
+                ctx.beginPath(); ctx.moveTo(i*cellSize, 0); ctx.lineTo(i*cellSize, size); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i*cellSize); ctx.lineTo(size, i*cellSize); ctx.stroke();
+            }
+
+            for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                const val = board[r][c];
+                const isFire = fireEmojiCells.some(cell => cell.r === r && cell.c === c);
+                const x = c * cellSize + 4, y = r * cellSize + 4, w = cellSize - 8, h = cellSize - 8;
+                ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8;
+                if (val === BLACK) ctx.fillStyle = '#6b4a2e'; 
+                else if (val === WHITE) ctx.fillStyle = '#5b7a4a';
+                else {
+                    ctx.shadowBlur = 0;
+                    continue;
+                }
+                ctx.fillRect(x, y, w, h);
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = val === BLACK ? '#4d351e' : '#3b5a2a';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(x, y, w, h);
+                
+                if (isFire) {
+                    ctx.font = `${cellSize * 0.7}px "Segoe UI Emoji", "Apple Color Emoji", system-ui, sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(255, 100, 0, 0.8)';
+                    ctx.shadowBlur = 30;
+                    ctx.fillStyle = '#ff4400';
+                    ctx.fillText('🔥', x + w/2, y + h/2 + 2);
+                    ctx.shadowBlur = 0;
+                } else {
+                    const key = `${r},${c}`;
+                    let emoji = decorationMap[key] || getRandomEmoji();
+                    if (!decorationMap[key]) decorationMap[key] = emoji;
+                    ctx.font = `${cellSize * 0.55}px "Segoe UI Emoji", "Apple Color Emoji", system-ui, sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.2)';
+                    ctx.fillStyle = '#1f2f1a';
+                    ctx.fillText(emoji, x + w/2, y + h/2 + 2);
+                    ctx.shadowBlur = 0;
+                }
+                
+                if (victoryGlow && val === BLACK) {
+                    ctx.shadowColor = 'rgba(255, 215, 0, 0.3)';
+                    ctx.shadowBlur = 15;
+                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x-2, y-2, w+4, h+4);
+                    ctx.shadowBlur = 0;
+                }
+                if (aiRevengeActive && val === WHITE) {
+                    const blink = Math.sin(Date.now() / 200) * 0.5 + 0.5;
+                    ctx.shadowColor = `rgba(255, 0, 0, ${blink * 0.5})`;
+                    ctx.shadowBlur = 20 * blink + 5;
+                    ctx.strokeStyle = `rgba(255, 0, 0, ${blink * 0.6})`;
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x-2, y-2, w+4, h+4);
+                    ctx.shadowBlur = 0;
+                }
+            }
+            
+            if (!gameOver && gameStarted && currentPlayer === BLACK && !skillTriggered && !chainActive && !swapAnimating && !swapAnimatingAI && !explosionAnimationActive) {
+                const moves = getValidMoves(board, BLACK);
+                for (let [r, c] of moves) {
+                    const x = c * cellSize + cellSize/2, y = r * cellSize + cellSize/2;
+                    ctx.beginPath(); ctx.arc(x, y, cellSize*0.18, 0, 2*Math.PI);
+                    ctx.fillStyle = 'rgba(255, 240, 180, 0.7)';
+                    ctx.shadowBlur = 12; ctx.shadowColor = '#f5e68a';
+                    ctx.fill(); ctx.shadowBlur = 0;
+                }
+            }
+            // 星光指引已移除，不再使用
         }
 
         // ---------- 乾坤大挪移核心 ----------
@@ -655,16 +765,18 @@
             return true;
         }
 
-        // ---------- 通用交换动画（支持AI和玩家） ----------
         function performSwapWithAnimation(rowA, rowB, isAI = false, callback = null) {
-            if (swapAnimating || swapAnimatingAI) return;
+            if ((!isAI && swapAnimating) || (isAI && swapAnimatingAI)) {
+                if (callback) callback(false);
+                return;
+            }
             if (isAI) {
                 swapAnimatingAI = true;
             } else {
                 swapAnimating = true;
                 swapBtn.disabled = true;
             }
-            messageBox.innerHTML = `🌀 ${isAI ? 'AI' : ''}大挪移！交换第 ${rowA+1} 行和第 ${rowB+1} 行...`;
+            messageBox.innerHTML = `🌀 ${isAI ? 'AI ' : ''}大挪移！交换第 ${rowA+1} 行和第 ${rowB+1} 行...`;
 
             let frame = 0;
             const totalFrames = 20;
@@ -693,22 +805,24 @@
                     drawBoard();
                     updateUI();
                     updateProgress();
+                    
                     if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
                         gameOver = true;
                         updateUI(); drawBoard(); updateProgress();
                         showGameOver();
-                        if (callback) callback();
+                        if (callback) callback(true);
                         return;
                     }
-                    if (!isAI && currentPlayer === BLACK) {
-                        // 正常
-                    } else if (!isAI) {
-                        currentPlayer = BLACK;
-                        turnText.innerText = '你的回合';
-                        turnBadge.className = 'turn-badge black';
-                        updateUI();
-                    }
+                    
                     if (!isAI) {
+                        if (currentPlayer === BLACK) {
+                            // 正常
+                        } else {
+                            currentPlayer = BLACK;
+                            turnText.innerText = '你的回合';
+                            turnBadge.className = 'turn-badge black';
+                            updateUI();
+                        }
                         const playerMoves = getValidMoves(board, BLACK);
                         if (playerMoves.length === 0 && !gameOver) {
                             currentPlayer = WHITE;
@@ -722,24 +836,31 @@
                             setTimeout(() => { aiTurn(); }, delay);
                         }
                     }
-                    if (callback) callback();
+                    
+                    if (callback) callback(true);
                 }
             }
             animateSwap();
         }
 
-        // ---------- AI 使用大挪移（带动画） ----------
-        function aiPerformSwapWithAnimation() {
-            if (!aiSwapAvailable || swapAnimatingAI) return;
+        function aiPerformSwap() {
+            if (!aiSwapAvailable || swapAnimatingAI) return false;
             let rowA = Math.floor(Math.random() * SIZE);
             let rowB;
             do { rowB = Math.floor(Math.random() * SIZE); } while (rowB === rowA);
-            performSwapWithAnimation(rowA, rowB, true);
+            performSwapWithAnimation(rowA, rowB, true, function(success) {
+                if (success && !gameOver) {
+                    setTimeout(() => { aiTurn(); }, 100);
+                }
+            });
+            return true;
         }
 
-        // ---------- 玩家使用大挪移 ----------
         function performRandomSwap() {
-            if (swapAnimating || swapAnimatingAI) return;
+            if (swapAnimating || swapAnimatingAI) {
+                messageBox.innerHTML = '⏳ 大挪移动画中，请稍候...';
+                return;
+            }
             if (!swapSkillAvailable) { messageBox.innerHTML = '⚠️ 暂无乾坤大挪移'; return; }
             if (currentPlayer !== BLACK) { messageBox.innerHTML = '⏳ 请在你的回合使用'; return; }
             if (gameOver) return;
@@ -749,7 +870,6 @@
             performSwapWithAnimation(rowA, rowB, false);
         }
 
-        // ---------- 绘制高亮动画（支持AI颜色） ----------
         function drawBoardWithHighlight(rowA, rowB, progress, isAI = false) {
             const size = 500;
             const cellSize = size / SIZE;
@@ -820,7 +940,114 @@
             }
         }
 
-        // ---------- AI 使用引爆技能 ----------
+        // ---------- 引爆技能 ----------
+        function executeExplosionWithAnimation(row, col, player, callback) {
+            const opponent = player === BLACK ? WHITE : BLACK;
+            let changed = 0;
+            const radius = CONFIG.EXPLOSION_RADIUS;
+            const affectedCells = [];
+            for (let r=Math.max(0, row-radius); r<=Math.min(SIZE-1, row+radius); r++) {
+                for (let c=Math.max(0, col-radius); c<=Math.min(SIZE-1, col+radius); c++) {
+                    const dist = Math.abs(r-row) + Math.abs(c-col);
+                    if (dist <= radius && board[r][c] === opponent) {
+                        board[r][c] = player;
+                        decorationMap[`${r},${c}`] = getRandomEmoji();
+                        changed++;
+                        affectedCells.push({r, c});
+                    }
+                }
+            }
+            if (board[row][col] === EMPTY) { 
+                board[row][col] = player; 
+                decorationMap[`${row},${col}`] = getRandomEmoji(); 
+                changed++;
+                affectedCells.push({r: row, c: col});
+            }
+
+            showFireEmoji(affectedCells, function() {
+                if (callback) callback(changed);
+            });
+            
+            drawBoardWithFire();
+            updateUI();
+            updateProgress();
+            return changed;
+        }
+
+        // ---------- 连锁爆炸 ----------
+        function executeChainExplosion(row, col) {
+            if (chainActive) return;
+            chainActive = true;
+            let chainCount = 0;
+            let maxChain = 8;
+
+            function doChain() {
+                if (chainCount >= maxChain || gameOver) {
+                    chainActive = false;
+                    if (!gameOver) {
+                        currentPlayer = WHITE;
+                        updateUI(); drawBoard(); updateProgress();
+                        messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiRevengeActive ? ' (复仇模式!)' : '');
+                        turnText.innerText = 'AI 回合';
+                        turnBadge.className = 'turn-badge white';
+                        const config = getLevelConfig(currentLevel);
+                        let delay = config.aiDelay;
+                        if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                        setTimeout(() => { aiTurn(); }, delay);
+                    }
+                    return;
+                }
+                
+                executeExplosionWithAnimation(row, col, BLACK, function(changed) {
+                    chainCount++;
+                    if (changed > 0) {
+                        showFloat(`💥 连锁×${chainCount}`, true);
+                        if (checkFullLine(board, BLACK) && !gameOver) {
+                            setTimeout(() => { 
+                                if (!gameOver) doChain(); 
+                            }, 500);
+                        } else {
+                            chainActive = false;
+                            if (!gameOver) {
+                                currentPlayer = WHITE;
+                                updateUI(); drawBoard(); updateProgress();
+                                messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiRevengeActive ? ' (复仇模式!)' : '');
+                                turnText.innerText = 'AI 回合';
+                                turnBadge.className = 'turn-badge white';
+                                const config = getLevelConfig(currentLevel);
+                                let delay = config.aiDelay;
+                                if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                                setTimeout(() => { aiTurn(); }, delay);
+                            }
+                        }
+                    } else {
+                        chainActive = false;
+                        if (!gameOver) {
+                            currentPlayer = WHITE;
+                            updateUI(); drawBoard(); updateProgress();
+                            messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiRevengeActive ? ' (复仇模式!)' : '');
+                            turnText.innerText = 'AI 回合';
+                            turnBadge.className = 'turn-badge white';
+                            const config = getLevelConfig(currentLevel);
+                            let delay = config.aiDelay;
+                            if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                            setTimeout(() => { aiTurn(); }, delay);
+                        }
+                    }
+                    drawBoard();
+                    updateUI();
+                    updateProgress();
+                    if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
+                        gameOver = true;
+                        chainActive = false;
+                        drawBoard();
+                        showGameOver();
+                    }
+                });
+            }
+            doChain();
+        }
+
         function aiUseExplosion() {
             if (!aiSkillAvailable) return false;
             let bestScore = -1;
@@ -847,13 +1074,10 @@
             }
             if (bestPos && bestScore > 0) {
                 const [row, col] = bestPos;
-                const changed = triggerExplosion(row, col, WHITE);
+                const changed = executeExplosionWithAnimation(row, col, WHITE, function() {});
                 aiSkillAvailable = false;
                 showFloat(`💥 AI 引爆！转化了 ${changed} 个`, false, true);
                 messageBox.innerHTML = `🤖 AI 引爆！转化了 ${changed} 个棋子！`;
-                drawBoard();
-                updateUI();
-                updateProgress();
                 return true;
             }
             return false;
@@ -911,8 +1135,14 @@
             aiSlowDown = false;
             victoryGlow = false;
             dominationGlow = false;
+            explosionAnimationActive = false;
+            fireEmojiCells = [];
+            if (fireAnimationTimer) {
+                clearTimeout(fireAnimationTimer);
+                fireAnimationTimer = null;
+            }
             window.shieldActive = false;
-            window.starHint = null;
+            // 移除 starHint 相关
             skillBtn.disabled = true;
             swapBtn.disabled = true;
             swapBtn.classList.remove('special');
@@ -1214,11 +1444,8 @@
                     return true;
                 }},
                 { name: '🌟 星光指引', action: () => {
-                    const moves = getValidMoves(board, BLACK);
-                    if (moves.length === 0) return false;
-                    const [r,c] = moves[Math.floor(Math.random() * moves.length)];
-                    window.starHint = [r,c];
-                    return true;
+                    // 不再使用星光指引，避免干扰
+                    return false;
                 }}
             ];
             const evt = events[Math.floor(Math.random() * events.length)];
@@ -1239,6 +1466,10 @@
             if (!gameStarted || gameOver || chainActive) return false;
             if (swapAnimating || swapAnimatingAI) {
                 messageBox.innerHTML = '⏳ 大挪移动画中，请稍候...';
+                return false;
+            }
+            if (explosionAnimationActive) {
+                messageBox.innerHTML = '⏳ 火焰动画中，请稍候...';
                 return false;
             }
             if (currentPlayer !== BLACK) { messageBox.innerHTML = '⏳ 请等待AI思考...'; return false; }
@@ -1339,104 +1570,24 @@
             return true;
         }
 
-        function executeChainExplosion(row, col) {
-            if (chainActive) return;
-            chainActive = true;
-            let chainCount = 0;
-            let maxChain = 8;
-
-            function doChain() {
-                if (chainCount >= maxChain || gameOver) {
-                    chainActive = false;
-                    if (!gameOver) {
-                        currentPlayer = WHITE;
-                        updateUI(); drawBoard(); updateProgress();
-                        messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiRevengeActive ? ' (复仇模式!)' : '');
-                        turnText.innerText = 'AI 回合';
-                        turnBadge.className = 'turn-badge white';
-                        const config = getLevelConfig(currentLevel);
-                        let delay = config.aiDelay;
-                        if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
-                        setTimeout(() => { aiTurn(); }, delay);
-                    }
-                    return;
-                }
-                const changed = triggerExplosion(row, col, BLACK);
-                chainCount++;
-                if (changed > 0) {
-                    showFloat(`💥 连锁×${chainCount}`, true);
-                    if (checkFullLine(board, BLACK) && !gameOver) {
-                        setTimeout(() => { if (!gameOver) doChain(); }, 350);
-                    } else {
-                        chainActive = false;
-                        if (!gameOver) {
-                            currentPlayer = WHITE;
-                            updateUI(); drawBoard(); updateProgress();
-                            messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiRevengeActive ? ' (复仇模式!)' : '');
-                            turnText.innerText = 'AI 回合';
-                            turnBadge.className = 'turn-badge white';
-                            const config = getLevelConfig(currentLevel);
-                            let delay = config.aiDelay;
-                            if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
-                            setTimeout(() => { aiTurn(); }, delay);
-                        }
-                    }
-                } else {
-                    chainActive = false;
-                    if (!gameOver) {
-                        currentPlayer = WHITE;
-                        updateUI(); drawBoard(); updateProgress();
-                        messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiRevengeActive ? ' (复仇模式!)' : '');
-                        turnText.innerText = 'AI 回合';
-                        turnBadge.className = 'turn-badge white';
-                        const config = getLevelConfig(currentLevel);
-                        let delay = config.aiDelay;
-                        if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
-                        setTimeout(() => { aiTurn(); }, delay);
-                    }
-                }
-                drawBoard();
-                updateUI();
-                updateProgress();
-                if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
-                    gameOver = true;
-                    chainActive = false;
-                    drawBoard();
-                    showGameOver();
-                }
-            }
-            doChain();
-        }
-
-        // ---------- AI 回合（修改：AI大挪移使用动画） ----------
+        // AI 回合
         function aiTurn() {
             if (!gameStarted || gameOver || chainActive) return;
             if (swapAnimating || swapAnimatingAI) {
                 setTimeout(() => { aiTurn(); }, 200);
                 return;
             }
+            if (explosionAnimationActive) {
+                setTimeout(() => { aiTurn(); }, 200);
+                return;
+            }
             if (currentPlayer !== WHITE) return;
 
-            // AI 使用大挪移（带动画）
             if (aiSwapAvailable && Math.random() < 0.5) {
-                // 使用带动画的版本，并在动画完成后继续
-                aiPerformSwapWithAnimation();
-                // 动画完成后会通过callback继续
-                // 由于动画是异步的，我们需要等待动画完成
-                // 这里我们使用一个简单的延迟检查
-                const checkDone = setInterval(() => {
-                    if (!swapAnimatingAI) {
-                        clearInterval(checkDone);
-                        if (!gameOver) {
-                            // 动画完成后，AI再走一步
-                            setTimeout(() => { aiTurn(); }, 100);
-                        }
-                    }
-                }, 100);
+                aiPerformSwap();
                 return;
             }
 
-            // AI 使用引爆技能
             if (aiSkillAvailable && Math.random() < CONFIG.AI_SKILL_CHANCE) {
                 const used = aiUseExplosion();
                 if (used && !gameOver) {
@@ -1536,6 +1687,10 @@
                 messageBox.innerHTML = '⏳ 大挪移动画中，请稍候...';
                 return;
             }
+            if (explosionAnimationActive) {
+                messageBox.innerHTML = '⏳ 火焰动画中，请稍候...';
+                return;
+            }
             if (!skillAvailable) { messageBox.innerHTML = '⚠️ 暂无引爆技能，请先填满一行或一列'; return; }
             if (currentPlayer !== BLACK) { messageBox.innerHTML = '⏳ 请在你的回合使用技能'; return; }
             skillTriggered = true;
@@ -1569,6 +1724,10 @@
                 messageBox.innerHTML = '⏳ 大挪移动画中，请稍候...';
                 return;
             }
+            if (explosionAnimationActive) {
+                messageBox.innerHTML = '⏳ 火焰动画中，请稍候...';
+                return;
+            }
             if (!swapSkillAvailable) {
                 messageBox.innerHTML = '⚠️ 暂无乾坤大挪移，请一次翻转≥5个棋子获得';
                 return;
@@ -1595,7 +1754,12 @@
             if (currentLevel === 1 && won) {
                 level2Unlocked = true; level2Btn.disabled = false;
                 messageBox.innerHTML += ' 🌟 第二关已解锁！即将自动进入...';
-                setTimeout(() => { if (currentLevel === 1) { initLevel(2); messageBox.innerHTML = '🔥 第二关: 技能对决！'; } }, 1500);
+                setTimeout(() => { 
+                    if (currentLevel === 1) { 
+                        initLevel(2); 
+                        messageBox.innerHTML = '🔥 第二关: 技能对决！'; 
+                    }
+                }, 1500);
             }
             if (currentLevel === 2 && won) messageBox.innerHTML += ' 🎉 你通关了所有关卡！太棒啦！';
             if (won) {
@@ -1613,12 +1777,12 @@
                 if (currentPlayer === BLACK) { turnText.innerText = '你的回合'; turnBadge.className = 'turn-badge black'; }
                 else { turnText.innerText = 'AI 回合'; turnBadge.className = 'turn-badge white'; }
             }
-            if (skillAvailable && !skillTriggered && !gameOver && currentPlayer === BLACK && !chainActive && !swapAnimating && !swapAnimatingAI) {
+            if (skillAvailable && !skillTriggered && !gameOver && currentPlayer === BLACK && !chainActive && !swapAnimating && !swapAnimatingAI && !explosionAnimationActive) {
                 skillBtn.disabled = false;
             } else {
                 skillBtn.disabled = true;
             }
-            if (swapSkillAvailable && !swapAnimating && !swapAnimatingAI && !gameOver && currentPlayer === BLACK && !chainActive) {
+            if (swapSkillAvailable && !swapAnimating && !swapAnimatingAI && !gameOver && currentPlayer === BLACK && !chainActive && !explosionAnimationActive) {
                 swapBtn.disabled = false;
                 swapBtn.classList.add('special');
             } else {
@@ -1640,8 +1804,6 @@
                 ctx.beginPath(); ctx.moveTo(i*cellSize, 0); ctx.lineTo(i*cellSize, size); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(0, i*cellSize); ctx.lineTo(size, i*cellSize); ctx.stroke();
             }
-            let starPos = null;
-            if (window.starHint) { starPos = window.starHint; window.starHint = null; }
             for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
                 const val = board[r][c];
                 if (val === EMPTY) continue;
@@ -1680,7 +1842,7 @@
                     ctx.shadowBlur = 0;
                 }
             }
-            if (!gameOver && gameStarted && currentPlayer === BLACK && !skillTriggered && !chainActive && !swapAnimating && !swapAnimatingAI) {
+            if (!gameOver && gameStarted && currentPlayer === BLACK && !skillTriggered && !chainActive && !swapAnimating && !swapAnimatingAI && !explosionAnimationActive) {
                 const moves = getValidMoves(board, BLACK);
                 for (let [r, c] of moves) {
                     const x = c * cellSize + cellSize/2, y = r * cellSize + cellSize/2;
@@ -1689,17 +1851,6 @@
                     ctx.shadowBlur = 12; ctx.shadowColor = '#f5e68a';
                     ctx.fill(); ctx.shadowBlur = 0;
                 }
-            }
-            if (starPos) {
-                const [r,c] = starPos;
-                const x = c * cellSize + cellSize/2, y = r * cellSize + cellSize/2;
-                ctx.beginPath(); ctx.arc(x, y, cellSize*0.4, 0, 2*Math.PI);
-                ctx.fillStyle = 'rgba(255, 255, 200, 0.3)';
-                ctx.shadowBlur = 50; ctx.shadowColor = '#f5e68a';
-                ctx.fill(); ctx.shadowBlur = 0;
-                ctx.strokeStyle = '#f5e68a'; ctx.lineWidth = 3;
-                ctx.beginPath(); ctx.arc(x, y, cellSize*0.4, 0, 2*Math.PI);
-                ctx.stroke();
             }
         }
 
@@ -1730,14 +1881,14 @@
         }
 
         canvas.addEventListener('click', (e) => {
-            if (skillTriggered || chainActive || swapAnimating || swapAnimatingAI) return;
+            if (skillTriggered || chainActive || swapAnimating || swapAnimatingAI || explosionAnimationActive) return;
             const pos = getClickPos(e);
             if (!pos) return;
             handlePlayerMove(pos.row, pos.col);
         });
 
         canvas.addEventListener('touchstart', (e) => {
-            if (skillTriggered || chainActive || swapAnimating || swapAnimatingAI) return;
+            if (skillTriggered || chainActive || swapAnimating || swapAnimatingAI || explosionAnimationActive) return;
             const pos = getClickPos(e);
             if (!pos) return;
             handlePlayerMove(pos.row, pos.col);
