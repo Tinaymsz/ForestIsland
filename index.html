@@ -746,7 +746,6 @@
                     ctx.fill(); ctx.shadowBlur = 0;
                 }
             }
-            // 星光指引已移除，不再使用
         }
 
         // ---------- 乾坤大挪移核心 ----------
@@ -1142,7 +1141,6 @@
                 fireAnimationTimer = null;
             }
             window.shieldActive = false;
-            // 移除 starHint 相关
             skillBtn.disabled = true;
             swapBtn.disabled = true;
             swapBtn.classList.remove('special');
@@ -1241,13 +1239,17 @@
             return changed;
         }
 
-        function checkGameOver(board, player) {
-            const moves = getValidMoves(board, player);
+        // 检查游戏是否结束：检查当前玩家是否还有合法步，如果没有则切换，如果对方也没有则游戏结束
+        function checkGameOver(board, currentPlayer) {
+            // 检查当前玩家是否有合法步
+            const moves = getValidMoves(board, currentPlayer);
             if (moves.length > 0) return false;
-            const opponent = player === BLACK ? WHITE : BLACK;
+            // 当前玩家无步可走，切换对方检查
+            const opponent = currentPlayer === BLACK ? WHITE : BLACK;
             const oppMoves = getValidMoves(board, opponent);
             if (oppMoves.length === 0) return true;
-            return false;
+            // 对方有步可走，当前玩家跳过回合
+            return false; // 不结束，只是跳过
         }
 
         function countScore(board) {
@@ -1475,8 +1477,17 @@
             if (currentPlayer !== BLACK) { messageBox.innerHTML = '⏳ 请等待AI思考...'; return false; }
             const moves = getValidMoves(board, BLACK);
             if (moves.length === 0) {
+                // 玩家无步可走，切换到AI
                 currentPlayer = WHITE;
                 updateUI(); drawBoard(); updateProgress();
+                // 检查AI是否有步可走
+                const aiMoves = getValidMoves(board, WHITE);
+                if (aiMoves.length === 0) {
+                    // 双方都无步可走，游戏结束
+                    gameOver = true;
+                    showGameOver();
+                    return true;
+                }
                 messageBox.innerHTML = '⏭️ 你无步可走，AI走棋';
                 const config = getLevelConfig(currentLevel);
                 let delay = config.aiDelay;
@@ -1542,7 +1553,9 @@
                 }
             }
 
-            if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
+            // 检查游戏结束：玩家落子后检查AI是否还有步可走
+            const aiMovesAfter = getValidMoves(board, WHITE);
+            if (aiMovesAfter.length === 0 && getValidMoves(board, BLACK).length === 0) {
                 gameOver = true;
                 updateUI(); drawBoard(); updateProgress();
                 showGameOver();
@@ -1591,7 +1604,8 @@
             if (aiSkillAvailable && Math.random() < CONFIG.AI_SKILL_CHANCE) {
                 const used = aiUseExplosion();
                 if (used && !gameOver) {
-                    if (checkGameOver(board, BLACK) || checkGameOver(board, WHITE)) {
+                    const aiMovesAfter = getValidMoves(board, WHITE);
+                    if (aiMovesAfter.length === 0 && getValidMoves(board, BLACK).length === 0) {
                         gameOver = true;
                         updateUI(); drawBoard(); updateProgress();
                         showGameOver();
@@ -1614,15 +1628,28 @@
 
             const moves = getValidMoves(board, WHITE);
             if (moves.length === 0) {
+                // AI无步可走，检查玩家
+                const playerMoves = getValidMoves(board, BLACK);
+                if (playerMoves.length === 0) {
+                    gameOver = true;
+                    updateUI(); drawBoard(); updateProgress();
+                    showGameOver();
+                    return;
+                }
                 currentPlayer = BLACK;
                 updateUI(); drawBoard(); updateProgress();
-                if (checkGameOver(board, BLACK)) { gameOver = true; showGameOver(); }
-                else { messageBox.innerHTML = '⏭️ AI 无步可走，轮到你'; turnText.innerText = '你的回合'; turnBadge.className = 'turn-badge black'; }
+                messageBox.innerHTML = '⏭️ AI 无步可走，轮到你';
+                turnText.innerText = '你的回合';
+                turnBadge.className = 'turn-badge black';
                 return;
             }
 
             const move = aiMove(board, WHITE);
-            if (!move) { currentPlayer = BLACK; updateUI(); return; }
+            if (!move) { 
+                currentPlayer = BLACK; 
+                updateUI(); 
+                return; 
+            }
             const [row, col] = move;
             const flipped = makeMove(board, row, col, WHITE);
 
@@ -1650,7 +1677,9 @@
                 }
             }
 
-            if (checkGameOver(board, BLACK) || checkGameOver(board, WHITE)) {
+            // 检查游戏结束
+            const playerMovesAfter = getValidMoves(board, BLACK);
+            if (playerMovesAfter.length === 0 && getValidMoves(board, WHITE).length === 0) {
                 gameOver = true;
                 updateUI(); drawBoard(); updateProgress();
                 showGameOver();
@@ -1664,8 +1693,15 @@
             turnBadge.className = 'turn-badge black';
             const playerMoves = getValidMoves(board, BLACK);
             if (playerMoves.length === 0) {
+                // 玩家无步可走，切换到AI
                 currentPlayer = WHITE;
                 updateUI(); drawBoard(); updateProgress();
+                const aiMoves = getValidMoves(board, WHITE);
+                if (aiMoves.length === 0) {
+                    gameOver = true;
+                    showGameOver();
+                    return;
+                }
                 messageBox.innerHTML = '⏭️ 你无步可走，AI走棋';
                 turnText.innerText = 'AI 回合';
                 turnBadge.className = 'turn-badge white';
