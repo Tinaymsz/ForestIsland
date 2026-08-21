@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>森林翻转棋 · 赢定了！</title>
+    <title>森林翻转棋 · 第二关炼狱</title>
     <style>
         * {
             box-sizing: border-box;
@@ -87,7 +87,6 @@
             0%, 100% { box-shadow: 0 0 40px rgba(255, 215, 0, 0.4), 0 0 80px rgba(255, 215, 0, 0.2), 0 10px 20px rgba(0,0,0,0.6); }
             50% { box-shadow: 0 0 60px rgba(255, 215, 0, 0.7), 0 0 120px rgba(255, 215, 0, 0.4), 0 10px 20px rgba(0,0,0,0.6); }
         }
-        /* 进度条 */
         .progress-wrap {
             width: 100%;
             margin-top: 12px;
@@ -306,7 +305,6 @@
             border-color: #ffd700;
             box-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
         }
-        /* 技能弹窗 */
         .skill-tip {
             position: fixed;
             top: 50%;
@@ -336,8 +334,6 @@
             pointer-events: auto;
         }
         .skill-tip span { font-size: 2.8rem; }
-
-        /* 浮动大字 */
         .float-text {
             position: fixed;
             top: 30%;
@@ -367,14 +363,12 @@
             30% { opacity: 1; transform: translate(-50%, -70%) scale(1.3); }
             100% { opacity: 0; transform: translate(-50%, -140%) scale(1); }
         }
-
         .float-text.dominate {
             color: #ff4400;
             text-shadow: 0 0 60px #ff2200, 0 4px 12px rgba(0,0,0,0.8);
             border-color: #ff4400;
             font-size: 4.5rem;
         }
-
         .level-info {
             display: flex;
             justify-content: center;
@@ -448,13 +442,11 @@
 <div class="game-container" id="gameContainer">
     <div class="board-wrapper">
         <canvas id="boardCanvas" width="500" height="500"></canvas>
-        <!-- 进度条 -->
         <div class="progress-wrap" id="progressWrap">
             <div class="progress-fill" id="progressFill" style="width:12.5%"></div>
             <div class="progress-label" id="progressLabel">🌱 势均力敌</div>
         </div>
     </div>
-
     <div class="level-info">
         <span class="level-indicator" id="levelDisplay">🏁 第 1 关 · 简单</span>
         <div class="level-control">
@@ -462,7 +454,6 @@
             <button class="level-btn" id="level2Btn" disabled>🔥 第二关</button>
         </div>
     </div>
-
     <div class="status-panel">
         <div class="score-board">
             <div class="score-item"><span class="score-dot black"></span><span class="score-number" id="blackScore">2</span></div>
@@ -478,26 +469,22 @@
         </div>
         <button class="btn-reset" id="resetBtn">↻ 重开</button>
     </div>
-    <div class="message-box" id="messageBox">🌳 爽感全开 · 赢定了！</div>
+    <div class="message-box" id="messageBox">🌳 爽感全开 · 第二关炼狱难度</div>
 </div>
-
-<!-- 技能获得弹窗 -->
 <div id="skillTip" class="skill-tip"><span>🎉</span> 恭喜获得技能！ <span>💥</span></div>
-<!-- 浮动大字 -->
 <div id="floatText" class="float-text">🔥 连击!</div>
-
 <script>
     (function(){
         // ==================== 爽感配置区 ====================
         const CONFIG = {
-            GOD_FALL_COUNT: 4,          // 天降神兵数量
-            RAGE_THRESHOLD: 3,          // 暴走模式触发所需连续连击次数
-            RAGE_DURATION: 2,           // 暴走模式持续回合数
-            EXPLOSION_RADIUS: 3,        // 技能爆炸半径 (曼哈顿距离)
-            LUCKY_EVENT_RATE: 0.25,     // 幸运事件触发概率
-            VICTORY_THRESHOLD: 0.65,    // 胜利在望阈值
-            DOMINATION_THRESHOLD: 0.80, // 碾压阈值
-            AI_SLOW_DOWN: 1.5,          // AI 减速倍率
+            GOD_FALL_COUNT: 4,
+            RAGE_THRESHOLD: 3,
+            RAGE_DURATION: 2,
+            EXPLOSION_RADIUS: 3,
+            LUCKY_EVENT_RATE: 0.25,
+            VICTORY_THRESHOLD: 0.65,
+            DOMINATION_THRESHOLD: 0.80,
+            AI_SLOW_DOWN: 1.5,
         };
         // ====================================================
 
@@ -534,19 +521,13 @@
         let gameStarted = false;
         let level2Unlocked = false;
 
-        // 暴走模式
         let rageActive = false;
         let rageRemaining = 0;
         let consecutiveFlips = 0;
 
-        // 幸运事件
         let luckyUsed = false;
         let luckyEvent = null;
-
-        // AI 减速
         let aiSlowDown = false;
-
-        // 终局特效
         let victoryGlow = false;
         let dominationGlow = false;
 
@@ -555,16 +536,27 @@
 
         function getRandomEmoji() { return forestEmojis[Math.floor(Math.random() * forestEmojis.length)]; }
 
-        // ---------- 关卡配置 ----------
+        // ---------- 关卡配置：第二关取消随机 ----------
         function getLevelConfig(level) {
             if (level === 1) {
-                return { name: '第一关 · 简单', aiRandomRate: 0.65, aiDepth: 1, aiWeightScale: 0.3, aiDelay: 600 };
+                return { 
+                    name: '第一关 · 简单', 
+                    aiRandomRate: 0.65,      // 第一关保留大量随机，让玩家轻松过关
+                    aiDepth: 1, 
+                    aiWeightScale: 0.3, 
+                    aiDelay: 600 
+                };
             } else {
-                return { name: '第二关 · 标准', aiRandomRate: 0.35, aiDepth: 2, aiWeightScale: 1.0, aiDelay: 1000 };
+                return { 
+                    name: '第二关 · 炼狱', 
+                    aiRandomRate: 0,          // 第二关完全取消随机！AI 全力计算
+                    aiDepth: 3,               // 搜索深度从 2 提升到 3，棋力更强
+                    aiWeightScale: 1.2,       // 权重放大，更重视角/边
+                    aiDelay: 1200             // 思考稍慢，但更精准
+                };
             }
         }
 
-        // ---------- 初始化 ----------
         function initLevel(level) {
             currentLevel = level;
             gameStarted = true;
@@ -575,18 +567,15 @@
             board[mid][mid-1] = BLACK;
             board[mid][mid] = WHITE;
 
-            // 天降神兵：随机在中央区域生成己方棋子
             if (level === 1) {
                 board[0][0] = BLACK; board[0][7] = BLACK; board[7][0] = BLACK; board[7][7] = BLACK;
                 board[2][2] = EMPTY; board[2][5] = EMPTY; board[5][2] = EMPTY; board[5][5] = EMPTY;
             }
-            // 天降神兵（所有关卡都加，让玩家开局爽）
             let godCount = CONFIG.GOD_FALL_COUNT;
             let emptyCells = [];
             for (let r=2; r<=5; r++) for (let c=2; c<=5; c++) {
                 if (board[r][c] === EMPTY) emptyCells.push([r,c]);
             }
-            // 打乱
             for (let i=emptyCells.length-1; i>0; i--) {
                 const j = Math.floor(Math.random() * (i+1));
                 [emptyCells[i], emptyCells[j]] = [emptyCells[j], emptyCells[i]];
@@ -622,7 +611,7 @@
             updateProgress();
             const config = getLevelConfig(level);
             levelDisplay.innerHTML = `🏁 ${config.name}`;
-            messageBox.innerHTML = level === 1 ? '🌱 第一关: 超简单，开局送棋子！' : '🔥 第二关: 标准难度，认真对战！';
+            messageBox.innerHTML = level === 1 ? '🌱 第一关: 超简单，AI 经常乱走！' : '🔥 第二关: 炼狱难度，AI 全力计算！';
             turnText.innerText = '你的回合';
             turnBadge.className = 'turn-badge black';
             skillTip.classList.remove('show');
@@ -630,13 +619,12 @@
             level2Btn.classList.toggle('active', level === 2);
             if (level2Unlocked) level2Btn.disabled = false; else level2Btn.disabled = true;
             if (level === 2 && !level2Unlocked) { initLevel(1); return; }
-            // 重置特效
             gameContainer.classList.remove('glow', 'dominate');
             canvas.classList.remove('victory-pulse');
             document.body.classList.remove('victory-glow', 'domination-glow');
         }
 
-        // ---------- 核心函数 ----------
+        // ----- 核心函数 -----
         function getValidMoves(board, player) {
             const moves = [];
             const opponent = player === BLACK ? WHITE : BLACK;
@@ -728,12 +716,19 @@
             return { black, white };
         }
 
-        // ---------- AI ----------
+        // ---------- AI (第二关无随机，深度3) ----------
         function aiMove(board, player) {
             const config = getLevelConfig(currentLevel);
             const moves = getValidMoves(board, player);
             if (moves.length === 0) return null;
-            if (Math.random() < config.aiRandomRate) return moves[Math.floor(Math.random() * moves.length)];
+            
+            // 第二关：完全无随机
+            // 第一关：保留随机率
+            if (Math.random() < config.aiRandomRate) {
+                return moves[Math.floor(Math.random() * moves.length)];
+            }
+
+            // 权重表 (第二关权重放大)
             const baseWeight = [
                 [60, -10, 5, 3, 3, 5, -10, 60],
                 [-10, -15, -1, -1, -1, -1, -15, -10],
@@ -745,6 +740,7 @@
                 [60, -10, 5, 3, 3, 5, -10, 60]
             ];
             const weightTable = baseWeight.map(row => row.map(v => v * config.aiWeightScale));
+
             function evaluate(board, player) {
                 const opp = player === BLACK ? WHITE : BLACK;
                 let score = 0;
@@ -760,6 +756,7 @@
                 score += (countP - countO) * 1;
                 return score;
             }
+
             function minimax(board, depth, alpha, beta, isMaximizing, currentPlayer) {
                 if (depth === 0) return { score: evaluate(board, currentPlayer) };
                 const player = isMaximizing ? currentPlayer : (currentPlayer === BLACK ? WHITE : BLACK);
@@ -794,18 +791,17 @@
                     return { score: minEval, move: bestMove };
                 }
             }
+
             const result = minimax(board, config.aiDepth, -Infinity, Infinity, true, player);
             return result.move || moves[0];
         }
 
-        // ---------- 暴走模式 ----------
+        // ---------- 其余函数 (与之前一致) ----------
         function applyRageEffect() {
             if (!rageActive) return 0;
-            // 暴走：额外翻转一个最近的敌方棋子
             let flipped = 0;
             for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
                 if (board[r][c] === WHITE) {
-                    // 找最近的
                     board[r][c] = BLACK;
                     decorationMap[`${r},${c}`] = getRandomEmoji();
                     flipped++;
@@ -818,59 +814,40 @@
             return flipped;
         }
 
-        // ---------- 进度条更新 (含胜利倒计时) ----------
         function updateProgress() {
             const { black, white } = countScore(board);
             const total = black + white;
-            if (total === 0) { 
-                progressFill.style.width = '12.5%'; 
-                progressLabel.textContent = '🌱 开局'; 
-                return; 
-            }
+            if (total === 0) { progressFill.style.width = '12.5%'; progressLabel.textContent = '🌱 开局'; return; }
             const ratio = black / total;
             const pct = Math.max(8, Math.min(92, ratio * 100));
             progressFill.style.width = pct + '%';
-
-            // 胜利倒计时和碾压提示
             const victoryThreshold = CONFIG.VICTORY_THRESHOLD;
             const dominationThreshold = CONFIG.DOMINATION_THRESHOLD;
-
             if (ratio >= dominationThreshold) {
                 progressLabel.textContent = '👑 即将碾压！';
                 progressFill.className = 'progress-fill dominate';
                 progressWrap.className = 'progress-wrap dominate';
                 progressLabel.className = 'progress-label victory';
-                dominationGlow = true;
-                victoryGlow = true;
+                dominationGlow = true; victoryGlow = true;
                 gameContainer.classList.add('dominate');
                 canvas.classList.add('victory-pulse');
                 document.body.classList.add('domination-glow');
-                if (!gameOver) {
-                    messageBox.className = 'message-box victory';
-                    messageBox.innerHTML = '👑 碾压在即！ AI 在颤抖...';
-                }
+                if (!gameOver) { messageBox.className = 'message-box victory'; messageBox.innerHTML = '👑 碾压在即！ AI 在颤抖...'; }
             } else if (ratio >= victoryThreshold) {
                 progressLabel.textContent = '⚡ 胜利在望！';
                 progressFill.className = 'progress-fill victory';
                 progressWrap.className = 'progress-wrap victory';
                 progressLabel.className = 'progress-label victory';
-                victoryGlow = true;
-                dominationGlow = false;
-                gameContainer.classList.add('glow');
-                gameContainer.classList.remove('dominate');
+                victoryGlow = true; dominationGlow = false;
+                gameContainer.classList.add('glow'); gameContainer.classList.remove('dominate');
                 canvas.classList.add('victory-pulse');
-                document.body.classList.add('victory-glow');
-                document.body.classList.remove('domination-glow');
-                if (!gameOver) {
-                    messageBox.className = 'message-box victory';
-                    messageBox.innerHTML = '⚡ 胜利在望！ 再下一城！';
-                }
+                document.body.classList.add('victory-glow'); document.body.classList.remove('domination-glow');
+                if (!gameOver) { messageBox.className = 'message-box victory'; messageBox.innerHTML = '⚡ 胜利在望！ 再下一城！'; }
             } else {
                 progressFill.className = 'progress-fill';
                 progressWrap.className = 'progress-wrap';
                 progressLabel.className = 'progress-label';
-                victoryGlow = false;
-                dominationGlow = false;
+                victoryGlow = false; dominationGlow = false;
                 gameContainer.classList.remove('glow', 'dominate');
                 canvas.classList.remove('victory-pulse');
                 document.body.classList.remove('victory-glow', 'domination-glow');
@@ -881,7 +858,6 @@
             }
         }
 
-        // ---------- 浮动大字 ----------
         function showFloat(text, isDominate = false) {
             floatText.textContent = text;
             floatText.className = 'float-text' + (isDominate ? ' dominate' : '');
@@ -891,7 +867,6 @@
             setTimeout(() => { floatText.classList.remove('show'); }, 1500);
         }
 
-        // ---------- 幸运事件 ----------
         function triggerLuckyEvent() {
             if (luckyUsed || gameOver) return;
             const events = [
@@ -907,10 +882,7 @@
                     }
                     return true;
                 }},
-                { name: '🛡️ 荆棘护盾', action: () => {
-                    window.shieldActive = true;
-                    return true;
-                }},
+                { name: '🛡️ 荆棘护盾', action: () => { window.shieldActive = true; return true; }},
                 { name: '🌟 星光指引', action: () => {
                     const moves = getValidMoves(board, BLACK);
                     if (moves.length === 0) return false;
@@ -933,7 +905,6 @@
             return false;
         }
 
-        // ---------- 游戏流程 ----------
         function handlePlayerMove(row, col) {
             if (!gameStarted || gameOver || chainActive) return false;
             if (currentPlayer !== BLACK) { messageBox.innerHTML = '⏳ 请等待AI思考...'; return false; }
@@ -953,63 +924,31 @@
             if (!valid) { messageBox.innerHTML = '❌ 无效位置，请选择高亮区域'; return false; }
 
             const flipped = makeMove(board, row, col, BLACK);
-
-            // 连击累计
             if (flipped >= 3) {
                 consecutiveFlips++;
-                if (flipped >= 5) {
-                    showFloat(`🔥 ${flipped}连击! 屠杀！`, true);
-                    messageBox.innerHTML = `💀 ${flipped}连击！屠杀！`;
-                } else {
-                    showFloat(`💪 ${flipped}连击! 碾压！`);
-                    messageBox.innerHTML = `💪 ${flipped}连击！碾压！`;
-                }
-                // 暴走模式触发
+                if (flipped >= 5) { showFloat(`🔥 ${flipped}连击! 屠杀！`, true); messageBox.innerHTML = `💀 ${flipped}连击！屠杀！`; }
+                else { showFloat(`💪 ${flipped}连击! 碾压！`); messageBox.innerHTML = `💪 ${flipped}连击！碾压！`; }
                 if (consecutiveFlips >= CONFIG.RAGE_THRESHOLD && !rageActive) {
-                    rageActive = true;
-                    rageRemaining = CONFIG.RAGE_DURATION;
+                    rageActive = true; rageRemaining = CONFIG.RAGE_DURATION;
                     showFloat('⚡ 暴走模式！', true);
                     messageBox.innerHTML = '⚡ 暴走模式激活！持续 ' + CONFIG.RAGE_DURATION + ' 回合！';
                 }
-            } else {
-                consecutiveFlips = 0;
-            }
-
-            // 暴走额外翻转
-            if (rageActive) {
-                const extra = applyRageEffect();
-                if (extra > 0) {
-                    messageBox.innerHTML += ' 🔥 暴走+1';
-                }
-            }
-
-            // 技能检测
+            } else { consecutiveFlips = 0; }
+            if (rageActive) { const extra = applyRageEffect(); if (extra > 0) messageBox.innerHTML += ' 🔥 暴走+1'; }
             if (checkFullLine(board, BLACK) && !skillAvailable && !gameOver) {
-                skillAvailable = true;
-                skillBtn.disabled = false;
+                skillAvailable = true; skillBtn.disabled = false;
                 messageBox.innerHTML = '💥 技能已激活！点击"引爆"';
                 showSkillTip();
             }
-
-            // 检查游戏结束
             if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
-                gameOver = true;
-                updateUI(); drawBoard(); updateProgress();
-                showGameOver();
+                gameOver = true; updateUI(); drawBoard(); updateProgress(); showGameOver();
                 return true;
             }
-
-            // 幸运事件
-            if (!luckyUsed && !gameOver && Math.random() < CONFIG.LUCKY_EVENT_RATE) {
-                triggerLuckyEvent();
-            }
-
-            // AI 减速（优势时）
+            if (!luckyUsed && !gameOver && Math.random() < CONFIG.LUCKY_EVENT_RATE) triggerLuckyEvent();
             const { black, white } = countScore(board);
             const total = black + white;
             const ratio = total > 0 ? black / total : 0;
             aiSlowDown = ratio >= CONFIG.VICTORY_THRESHOLD;
-
             currentPlayer = WHITE;
             updateUI(); drawBoard(); updateProgress();
             messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiSlowDown ? ' (AI 在颤抖)' : '');
@@ -1022,13 +961,11 @@
             return true;
         }
 
-        // ---------- 连锁爆炸 ----------
         function executeChainExplosion(row, col) {
             if (chainActive) return;
             chainActive = true;
             let chainCount = 0;
             let maxChain = 8;
-
             function doChain() {
                 if (chainCount >= maxChain || gameOver) {
                     chainActive = false;
@@ -1083,10 +1020,7 @@
                 updateUI();
                 updateProgress();
                 if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
-                    gameOver = true;
-                    chainActive = false;
-                    drawBoard();
-                    showGameOver();
+                    gameOver = true; chainActive = false; drawBoard(); showGameOver();
                 }
             }
             doChain();
@@ -1095,7 +1029,6 @@
         function aiTurn() {
             if (!gameStarted || gameOver || chainActive) return;
             if (currentPlayer !== WHITE) return;
-
             if (window.shieldActive) {
                 window.shieldActive = false;
                 currentPlayer = BLACK;
@@ -1105,7 +1038,6 @@
                 turnBadge.className = 'turn-badge black';
                 return;
             }
-
             const moves = getValidMoves(board, WHITE);
             if (moves.length === 0) {
                 currentPlayer = BLACK;
@@ -1114,14 +1046,17 @@
                 else { messageBox.innerHTML = '⏭️ AI 无步可走，轮到你'; turnText.innerText = '你的回合'; turnBadge.className = 'turn-badge black'; }
                 return;
             }
-            const move = aiMove(board, WHITE);
+            let move = aiMove(board, WHITE);
+            if (!move) {
+                const moves2 = getValidMoves(board, WHITE);
+                if (moves2.length === 0) { currentPlayer = BLACK; updateUI(); return; }
+                move = moves2[Math.floor(Math.random() * moves2.length)];
+            }
             if (!move) { currentPlayer = BLACK; updateUI(); return; }
             const [row, col] = move;
             makeMove(board, row, col, WHITE);
             if (checkGameOver(board, BLACK) || checkGameOver(board, WHITE)) {
-                gameOver = true;
-                updateUI(); drawBoard(); updateProgress();
-                showGameOver();
+                gameOver = true; updateUI(); drawBoard(); updateProgress(); showGameOver();
                 return;
             }
             currentPlayer = BLACK;
@@ -1143,7 +1078,6 @@
             }
         }
 
-        // ---------- UI ----------
         function showSkillTip() {
             skillTip.classList.add('show');
             setTimeout(() => skillTip.classList.remove('show'), 2500);
@@ -1166,9 +1100,7 @@
                 const col = Math.floor(mouseX / cellSize);
                 const row = Math.floor(mouseY / cellSize);
                 if (row >= 0 && row < SIZE && col >= 0 && col < SIZE) {
-                    skillAvailable = false;
-                    skillTriggered = false;
-                    skillBtn.disabled = true;
+                    skillAvailable = false; skillTriggered = false; skillBtn.disabled = true;
                     canvas.removeEventListener('click', handler);
                     executeChainExplosion(row, col);
                 } else {
@@ -1191,15 +1123,10 @@
             if (currentLevel === 1 && won) {
                 level2Unlocked = true; level2Btn.disabled = false;
                 messageBox.innerHTML += ' 🌟 第二关已解锁！即将自动进入...';
-                setTimeout(() => { if (currentLevel === 1) { initLevel(2); messageBox.innerHTML = '🔥 第二关: 标准难度，认真对战！'; } }, 1500);
+                setTimeout(() => { if (currentLevel === 1) { initLevel(2); messageBox.innerHTML = '🔥 第二关: 炼狱难度，AI 全力计算！'; } }, 1500);
             }
             if (currentLevel === 2 && won) messageBox.innerHTML += ' 🎉 你通关了所有关卡！太棒啦！';
-            // 终局特效：胜利时金光更亮
-            if (won) {
-                gameContainer.classList.add('dominate');
-                canvas.classList.add('victory-pulse');
-                document.body.classList.add('domination-glow');
-            }
+            if (won) { gameContainer.classList.add('dominate'); canvas.classList.add('victory-pulse'); document.body.classList.add('domination-glow'); }
         }
 
         function updateUI() {
@@ -1218,7 +1145,6 @@
             updateProgress();
         }
 
-        // ---------- 绘制 ----------
         function drawBoard() {
             const size = 500;
             const cellSize = size / SIZE;
@@ -1253,7 +1179,6 @@
                 ctx.fillStyle = '#1f2f1a';
                 ctx.fillText(emoji, x + w/2, y + h/2 + 2);
                 ctx.shadowBlur = 0;
-                // 脉动发光（优势时）
                 if (victoryGlow && val === BLACK) {
                     ctx.shadowColor = 'rgba(255, 215, 0, 0.3)';
                     ctx.shadowBlur = 15;
@@ -1317,7 +1242,6 @@
             if (confirm('重新开始当前关卡？')) initLevel(currentLevel);
         });
 
-        // 启动
         level2Unlocked = false;
         level2Btn.disabled = true;
         initLevel(1);
