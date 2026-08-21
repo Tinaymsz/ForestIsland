@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>森林翻转棋 · 赢定了！</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            user-select: none;
+        }
+        body {
+            background: linear-gradient(145deg, #3a6b4f 0%, #1f402e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 16px;
+            transition: background 0.5s;
+        }
+        body.victory-glow {
+            background: radial-gradient(ellipse at center, #6a8f5a 0%, #1f402e 100%);
+        }
+        body.domination-glow {
+            background: radial-gradient(ellipse at center, #8f7a3a 0%, #1f402e 100%);
+        }
+        .game-container {
+            background: #6f8f72;
+            background-image: radial-gradient(circle at 20% 30%, #8fb089, #3d6a4a);
+            padding: 2rem 2rem 1.8rem;
+            border-radius: 64px 64px 48px 48px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7), inset 0 2px 4px rgba(255, 255, 240, 0.3);
+            border: 2px solid #b9b08b;
+            max-width: 720px;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .game-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(255, 215, 0, 0.0) 0%, transparent 70%);
+            pointer-events: none;
+            transition: opacity 1s;
+            opacity: 0;
+            z-index: 0;
+        }
+        .game-container.glow::before {
+            opacity: 1;
+            background: radial-gradient(ellipse at center, rgba(255, 215, 0, 0.15) 0%, transparent 70%);
+        }
+        .game-container.dominate::before {
+            opacity: 1;
+            background: radial-gradient(ellipse at center, rgba(255, 200, 50, 0.3) 0%, rgba(255, 200, 50, 0.1) 50%, transparent 70%);
+        }
+        .board-wrapper {
+            background: #d6c9a8;
+            padding: 24px 24px 20px;
+            border-radius: 48px;
+            box-shadow: inset 0 -6px 0 #8b7d5e, 0 12px 24px rgba(0,0,0,0.5);
+            position: relative;
+            z-index: 1;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            width: 500px;
+            height: 500px;
+            background: #d9b382;
+            border-radius: 28px;
+            box-shadow: 0 0 0 2px #b8aa7a, 0 10px 20px rgba(0,0,0,0.6);
+            cursor: pointer;
+            touch-action: none;
+            transition: box-shadow 0.5s;
+        }
+        canvas.victory-pulse {
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.4), 0 0 80px rgba(255, 215, 0, 0.2), 0 10px 20px rgba(0,0,0,0.6);
+            animation: pulseGlow 1.2s ease-in-out infinite;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 40px rgba(255, 215, 0, 0.4), 0 0 80px rgba(255, 215, 0, 0.2), 0 10px 20px rgba(0,0,0,0.6); }
+            50% { box-shadow: 0 0 60px rgba(255, 215, 0, 0.7), 0 0 120px rgba(255, 215, 0, 0.4), 0 10px 20px rgba(0,0,0,0.6); }
+        }
+        /* 进度条 */
+        .progress-wrap {
+            width: 100%;
+            margin-top: 12px;
+            background: #1d3d2a;
+            border-radius: 30px;
+            height: 24px;
+            box-shadow: inset 0 2px 6px #0a1f14;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #7b9a6a;
+            transition: all 0.3s;
+        }
+        .progress-wrap.victory {
+            border-color: #f5d68a;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), inset 0 2px 6px #0a1f14;
+        }
+        .progress-wrap.dominate {
+            border-color: #ffaa00;
+            box-shadow: 0 0 40px rgba(255, 200, 0, 0.5), inset 0 2px 6px #0a1f14;
+            animation: progressPulse 0.8s ease-in-out infinite;
+        }
+        @keyframes progressPulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255, 200, 0, 0.4), inset 0 2px 6px #0a1f14; }
+            50% { box-shadow: 0 0 60px rgba(255, 200, 0, 0.7), inset 0 2px 6px #0a1f14; }
+        }
+        .progress-fill {
+            height: 100%;
+            width: 12.5%;
+            background: linear-gradient(90deg, #a67c4a, #d4a86a, #f5d68a);
+            border-radius: 30px;
+            transition: width 0.3s ease, background 0.5s;
+            box-shadow: 0 0 12px #f5d68a;
+            position: relative;
+        }
+        .progress-fill.victory {
+            background: linear-gradient(90deg, #f5d68a, #f5e68a, #ffd700);
+            box-shadow: 0 0 20px #ffd700;
+        }
+        .progress-fill.dominate {
+            background: linear-gradient(90deg, #ffd700, #ffaa00, #ff8800);
+            box-shadow: 0 0 30px #ff8800;
+            animation: fillPulse 0.6s ease-in-out infinite;
+        }
+        @keyframes fillPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .progress-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #fcf7e0;
+            text-shadow: 0 1px 4px #0a1f14, 0 0 12px rgba(0,0,0,0.5);
+            letter-spacing: 0.5px;
+            z-index: 2;
+        }
+        .progress-label.victory {
+            color: #fff8e0;
+            text-shadow: 0 0 20px #ffd700, 0 1px 4px #0a1f14;
+        }
+        .status-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 8px 0;
+            color: #f2edda;
+            text-shadow: 0 2px 3px #1f3d30;
+            font-weight: 600;
+            flex-wrap: wrap;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        .score-board {
+            display: flex;
+            gap: 28px;
+            background: #2e5f4a;
+            padding: 8px 24px 8px 20px;
+            border-radius: 40px;
+            box-shadow: inset 0 2px 6px #17352a, 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .score-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .score-dot {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        .score-dot.black { background: #6b4a2e; border: 1px solid #4d351e; }
+        .score-dot.white { background: #5b7a4a; border: 1px solid #3b5a2a; }
+        .score-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            min-width: 2rem;
+            text-align: center;
+        }
+        .turn-indicator {
+            background: #3c6d58;
+            padding: 8px 24px;
+            border-radius: 40px;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            box-shadow: inset 0 1px 4px #b0d0b0, 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .turn-badge {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: #ccc;
+            border: 2px solid #f0ecda;
+        }
+        .turn-badge.black { background: #6b4a2e; border-color: #8b6a4e; }
+        .turn-badge.white { background: #5b7a4a; border-color: #7b9a6a; }
+        .btn-reset {
+            background: #d8cba4;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 26px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #263f30;
+            box-shadow: 0 6px 0 #8d7d5a, 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: 0.05s linear;
+            border: 1px solid #efeacb;
+        }
+        .btn-reset:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #6b5d3f;
+        }
+        .btn-reset:hover { background: #e8ddb6; }
+        .skill-area {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: #2e5f4a;
+            padding: 6px 20px 6px 16px;
+            border-radius: 40px;
+            box-shadow: inset 0 2px 6px #17352a, 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .skill-badge {
+            background: #f5e68a;
+            color: #2a3f2a;
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 0 #8b7d4a;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-skill {
+            background: #f0c27f;
+            border: none;
+            border-radius: 30px;
+            padding: 4px 18px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #1f3a1f;
+            box-shadow: 0 4px 0 #8b6d3a, 0 2px 8px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: 0.05s linear;
+            border: 1px solid #f5dba8;
+        }
+        .btn-skill:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #6b4d2a;
+        }
+        .btn-skill:disabled {
+            opacity: 0.5;
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #6b4d2a;
+            pointer-events: none;
+        }
+        .message-box {
+            text-align: center;
+            margin-top: 14px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fcf7e0;
+            background: #1d4336;
+            padding: 8px 12px;
+            border-radius: 60px;
+            opacity: 0.9;
+            text-shadow: 0 2px 3px #0c281e;
+            min-height: 3.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: 1px solid #acb68a;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s;
+        }
+        .message-box.victory {
+            background: #4a6a2a;
+            border-color: #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
+        }
+        /* 技能弹窗 */
+        .skill-tip {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -70%);
+            background: #f5e68a;
+            color: #1f3a1f;
+            padding: 20px 40px;
+            border-radius: 60px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 0 4px #6b8f5a;
+            font-size: 2rem;
+            font-weight: 800;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+            border: 2px solid #fcf7d0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            white-space: nowrap;
+        }
+        .skill-tip.show {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+            pointer-events: auto;
+        }
+        .skill-tip span { font-size: 2.8rem; }
+
+        /* 浮动大字 */
+        .float-text {
+            position: fixed;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4rem;
+            font-weight: 900;
+            color: #ffd700;
+            text-shadow: 0 0 40px #ff8800, 0 4px 12px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.1s;
+            white-space: nowrap;
+            background: rgba(0,0,0,0.5);
+            padding: 12px 40px;
+            border-radius: 60px;
+            backdrop-filter: blur(4px);
+            border: 2px solid #ffd700;
+        }
+        .float-text.show {
+            opacity: 1;
+            animation: floatUp 1.4s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(0.6); }
+            30% { opacity: 1; transform: translate(-50%, -70%) scale(1.3); }
+            100% { opacity: 0; transform: translate(-50%, -140%) scale(1); }
+        }
+
+        .float-text.dominate {
+            color: #ff4400;
+            text-shadow: 0 0 60px #ff2200, 0 4px 12px rgba(0,0,0,0.8);
+            border-color: #ff4400;
+            font-size: 4.5rem;
+        }
+
+        .level-info {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+        .level-indicator {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fcf7e0;
+            background: #1d4336;
+            padding: 6px 20px;
+            border-radius: 40px;
+            border: 1px solid #acb68a;
+        }
+        .level-control {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .level-btn {
+            background: #4f7a5a;
+            border: none;
+            border-radius: 40px;
+            padding: 10px 32px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #f2edda;
+            box-shadow: 0 6px 0 #1f3d2a, 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: 0.05s linear;
+            border: 1px solid #8fb07a;
+            flex: 1;
+            min-width: 100px;
+        }
+        .level-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #1f3d2a;
+        }
+        .level-btn.active {
+            background: #f5e68a;
+            color: #1f3a1f;
+            box-shadow: 0 6px 0 #8b7d4a;
+            border-color: #d4c060;
+        }
+        .level-btn:disabled {
+            opacity: 0.5;
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #1f3d2a;
+            pointer-events: none;
+        }
+        @media (max-width: 600px) {
+            .game-container { padding: 1rem; border-radius: 40px; }
+            .board-wrapper { padding: 12px; }
+            canvas { width: 90vw; height: 90vw; max-width: 500px; max-height: 500px; }
+            .status-panel { flex-direction: column; align-items: stretch; gap: 8px; }
+            .score-board { justify-content: center; }
+            .turn-indicator { justify-content: center; }
+            .skill-area { justify-content: center; }
+            .float-text { font-size: 2.5rem; padding: 8px 24px; }
+            .float-text.dominate { font-size: 3rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container" id="gameContainer">
+    <div class="board-wrapper">
+        <canvas id="boardCanvas" width="500" height="500"></canvas>
+        <!-- 进度条 -->
+        <div class="progress-wrap" id="progressWrap">
+            <div class="progress-fill" id="progressFill" style="width:12.5%"></div>
+            <div class="progress-label" id="progressLabel">🌱 势均力敌</div>
+        </div>
+    </div>
+
+    <div class="level-info">
+        <span class="level-indicator" id="levelDisplay">🏁 第 1 关 · 简单</span>
+        <div class="level-control">
+            <button class="level-btn active" id="level1Btn">🌟 第一关</button>
+            <button class="level-btn" id="level2Btn" disabled>🔥 第二关</button>
+        </div>
+    </div>
+
+    <div class="status-panel">
+        <div class="score-board">
+            <div class="score-item"><span class="score-dot black"></span><span class="score-number" id="blackScore">2</span></div>
+            <div class="score-item"><span class="score-dot white"></span><span class="score-number" id="whiteScore">2</span></div>
+        </div>
+        <div class="turn-indicator">
+            <span id="turnText">你的回合</span>
+            <span class="turn-badge black" id="turnBadge"></span>
+        </div>
+        <div class="skill-area">
+            <span class="skill-badge">💥 技能</span>
+            <button class="btn-skill" id="skillBtn">引爆</button>
+        </div>
+        <button class="btn-reset" id="resetBtn">↻ 重开</button>
+    </div>
+    <div class="message-box" id="messageBox">🌳 爽感全开 · 赢定了！</div>
+</div>
+
+<!-- 技能获得弹窗 -->
+<div id="skillTip" class="skill-tip"><span>🎉</span> 恭喜获得技能！ <span>💥</span></div>
+<!-- 浮动大字 -->
+<div id="floatText" class="float-text">🔥 连击!</div>
+
+<script>
+    (function(){
+        // ==================== 爽感配置区 ====================
+        const CONFIG = {
+            GOD_FALL_COUNT: 4,          // 天降神兵数量
+            RAGE_THRESHOLD: 3,          // 暴走模式触发所需连续连击次数
+            RAGE_DURATION: 2,           // 暴走模式持续回合数
+            EXPLOSION_RADIUS: 3,        // 技能爆炸半径 (曼哈顿距离)
+            LUCKY_EVENT_RATE: 0.25,     // 幸运事件触发概率
+            VICTORY_THRESHOLD: 0.65,    // 胜利在望阈值
+            DOMINATION_THRESHOLD: 0.80, // 碾压阈值
+            AI_SLOW_DOWN: 1.5,          // AI 减速倍率
+        };
+        // ====================================================
+
+        const canvas = document.getElementById('boardCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('gameContainer');
+        const blackScoreSpan = document.getElementById('blackScore');
+        const whiteScoreSpan = document.getElementById('whiteScore');
+        const turnText = document.getElementById('turnText');
+        const turnBadge = document.getElementById('turnBadge');
+        const messageBox = document.getElementById('messageBox');
+        const skillBtn = document.getElementById('skillBtn');
+        const skillTip = document.getElementById('skillTip');
+        const floatText = document.getElementById('floatText');
+        const progressWrap = document.getElementById('progressWrap');
+        const progressFill = document.getElementById('progressFill');
+        const progressLabel = document.getElementById('progressLabel');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const level1Btn = document.getElementById('level1Btn');
+        const level2Btn = document.getElementById('level2Btn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        const SIZE = 8;
+        const EMPTY = 0, BLACK = 1, WHITE = 2;
+        let board = Array(SIZE).fill().map(() => Array(SIZE).fill(EMPTY));
+        let currentPlayer = BLACK;
+        let gameOver = false;
+
+        let skillAvailable = false;
+        let skillTriggered = false;
+        let chainActive = false;
+
+        let currentLevel = 1;
+        let gameStarted = false;
+        let level2Unlocked = false;
+
+        // 暴走模式
+        let rageActive = false;
+        let rageRemaining = 0;
+        let consecutiveFlips = 0;
+
+        // 幸运事件
+        let luckyUsed = false;
+        let luckyEvent = null;
+
+        // AI 减速
+        let aiSlowDown = false;
+
+        // 终局特效
+        let victoryGlow = false;
+        let dominationGlow = false;
+
+        const forestEmojis = ['🌲', '🌳', '🌴', '🌵', '🌱', '🌿', '☘️', '🍀', '🌺', '🌸', '🌷', '🌹', '🌻', '🌼', '💐', '🌸', '🌾', '🍃', '🌰', '🌲', '🌳', '🌴'];
+        let decorationMap = {};
+
+        function getRandomEmoji() { return forestEmojis[Math.floor(Math.random() * forestEmojis.length)]; }
+
+        // ---------- 关卡配置 ----------
+        function getLevelConfig(level) {
+            if (level === 1) {
+                return { name: '第一关 · 简单', aiRandomRate: 0.65, aiDepth: 1, aiWeightScale: 0.3, aiDelay: 600 };
+            } else {
+                return { name: '第二关 · 标准', aiRandomRate: 0.35, aiDepth: 2, aiWeightScale: 1.0, aiDelay: 1000 };
+            }
+        }
+
+        // ---------- 初始化 ----------
+        function initLevel(level) {
+            currentLevel = level;
+            gameStarted = true;
+            board = Array(SIZE).fill().map(() => Array(SIZE).fill(EMPTY));
+            const mid = SIZE / 2;
+            board[mid-1][mid-1] = WHITE;
+            board[mid-1][mid] = BLACK;
+            board[mid][mid-1] = BLACK;
+            board[mid][mid] = WHITE;
+
+            // 天降神兵：随机在中央区域生成己方棋子
+            if (level === 1) {
+                board[0][0] = BLACK; board[0][7] = BLACK; board[7][0] = BLACK; board[7][7] = BLACK;
+                board[2][2] = EMPTY; board[2][5] = EMPTY; board[5][2] = EMPTY; board[5][5] = EMPTY;
+            }
+            // 天降神兵（所有关卡都加，让玩家开局爽）
+            let godCount = CONFIG.GOD_FALL_COUNT;
+            let emptyCells = [];
+            for (let r=2; r<=5; r++) for (let c=2; c<=5; c++) {
+                if (board[r][c] === EMPTY) emptyCells.push([r,c]);
+            }
+            // 打乱
+            for (let i=emptyCells.length-1; i>0; i--) {
+                const j = Math.floor(Math.random() * (i+1));
+                [emptyCells[i], emptyCells[j]] = [emptyCells[j], emptyCells[i]];
+            }
+            for (let i=0; i<Math.min(godCount, emptyCells.length); i++) {
+                const [r,c] = emptyCells[i];
+                board[r][c] = BLACK;
+                decorationMap[`${r},${c}`] = getRandomEmoji();
+            }
+
+            currentPlayer = BLACK;
+            gameOver = false;
+            skillAvailable = false;
+            skillTriggered = false;
+            chainActive = false;
+            luckyUsed = false;
+            luckyEvent = null;
+            rageActive = false;
+            rageRemaining = 0;
+            consecutiveFlips = 0;
+            aiSlowDown = false;
+            victoryGlow = false;
+            dominationGlow = false;
+            window.shieldActive = false;
+            window.starHint = null;
+            skillBtn.disabled = true;
+            decorationMap = {};
+            for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                if (board[r][c] !== EMPTY) decorationMap[`${r},${c}`] = getRandomEmoji();
+            }
+            updateUI();
+            drawBoard();
+            updateProgress();
+            const config = getLevelConfig(level);
+            levelDisplay.innerHTML = `🏁 ${config.name}`;
+            messageBox.innerHTML = level === 1 ? '🌱 第一关: 超简单，开局送棋子！' : '🔥 第二关: 标准难度，认真对战！';
+            turnText.innerText = '你的回合';
+            turnBadge.className = 'turn-badge black';
+            skillTip.classList.remove('show');
+            level1Btn.classList.toggle('active', level === 1);
+            level2Btn.classList.toggle('active', level === 2);
+            if (level2Unlocked) level2Btn.disabled = false; else level2Btn.disabled = true;
+            if (level === 2 && !level2Unlocked) { initLevel(1); return; }
+            // 重置特效
+            gameContainer.classList.remove('glow', 'dominate');
+            canvas.classList.remove('victory-pulse');
+            document.body.classList.remove('victory-glow', 'domination-glow');
+        }
+
+        // ---------- 核心函数 ----------
+        function getValidMoves(board, player) {
+            const moves = [];
+            const opponent = player === BLACK ? WHITE : BLACK;
+            const directions = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+            for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                if (board[r][c] !== EMPTY) continue;
+                let valid = false;
+                for (let [dr, dc] of directions) {
+                    let nr = r + dr, nc = c + dc;
+                    let foundOpponent = false;
+                    while (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === opponent) {
+                        foundOpponent = true;
+                        nr += dr; nc += dc;
+                    }
+                    if (foundOpponent && nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === player) {
+                        valid = true; break;
+                    }
+                }
+                if (valid) moves.push([r, c]);
+            }
+            return moves;
+        }
+
+        function makeMove(board, row, col, player, noDecor = false) {
+            if (board[row][col] !== EMPTY) return 0;
+            const opponent = player === BLACK ? WHITE : BLACK;
+            const directions = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+            let toFlip = [];
+            for (let [dr, dc] of directions) {
+                let nr = row + dr, nc = col + dc;
+                let candidates = [];
+                while (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === opponent) {
+                    candidates.push([nr, nc]);
+                    nr += dr; nc += dc;
+                }
+                if (candidates.length > 0 && nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === player) {
+                    toFlip = toFlip.concat(candidates);
+                }
+            }
+            if (toFlip.length === 0) return 0;
+            board[row][col] = player;
+            for (let [r, c] of toFlip) { board[r][c] = player; }
+            if (!noDecor) {
+                decorationMap[`${row},${col}`] = getRandomEmoji();
+                for (let [r, c] of toFlip) { decorationMap[`${r},${c}`] = getRandomEmoji(); }
+            }
+            return toFlip.length;
+        }
+
+        function checkFullLine(board, player) {
+            for (let r=0; r<SIZE; r++) { let full = true; for (let c=0; c<SIZE; c++) { if (board[r][c] !== player) { full = false; break; } } if (full) return true; }
+            for (let c=0; c<SIZE; c++) { let full = true; for (let r=0; r<SIZE; r++) { if (board[r][c] !== player) { full = false; break; } } if (full) return true; }
+            return false;
+        }
+
+        function triggerExplosion(row, col, player) {
+            const opponent = player === BLACK ? WHITE : BLACK;
+            let changed = 0;
+            const radius = CONFIG.EXPLOSION_RADIUS;
+            for (let r=Math.max(0, row-radius); r<=Math.min(SIZE-1, row+radius); r++) {
+                for (let c=Math.max(0, col-radius); c<=Math.min(SIZE-1, col+radius); c++) {
+                    const dist = Math.abs(r-row) + Math.abs(c-col);
+                    if (dist <= radius && board[r][c] === opponent) {
+                        board[r][c] = player;
+                        decorationMap[`${r},${c}`] = getRandomEmoji();
+                        changed++;
+                    }
+                }
+            }
+            if (board[row][col] === EMPTY) { board[row][col] = player; decorationMap[`${row},${col}`] = getRandomEmoji(); changed++; }
+            return changed;
+        }
+
+        function checkGameOver(board, player) {
+            const moves = getValidMoves(board, player);
+            if (moves.length > 0) return false;
+            const opponent = player === BLACK ? WHITE : BLACK;
+            const oppMoves = getValidMoves(board, opponent);
+            if (oppMoves.length === 0) return true;
+            return false;
+        }
+
+        function countScore(board) {
+            let black = 0, white = 0;
+            for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                if (board[r][c] === BLACK) black++;
+                else if (board[r][c] === WHITE) white++;
+            }
+            return { black, white };
+        }
+
+        // ---------- AI ----------
+        function aiMove(board, player) {
+            const config = getLevelConfig(currentLevel);
+            const moves = getValidMoves(board, player);
+            if (moves.length === 0) return null;
+            if (Math.random() < config.aiRandomRate) return moves[Math.floor(Math.random() * moves.length)];
+            const baseWeight = [
+                [60, -10, 5, 3, 3, 5, -10, 60],
+                [-10, -15, -1, -1, -1, -1, -15, -10],
+                [5, -1, 1, 0, 0, 1, -1, 5],
+                [3, -1, 0, 0, 0, 0, -1, 3],
+                [3, -1, 0, 0, 0, 0, -1, 3],
+                [5, -1, 1, 0, 0, 1, -1, 5],
+                [-10, -15, -1, -1, -1, -1, -15, -10],
+                [60, -10, 5, 3, 3, 5, -10, 60]
+            ];
+            const weightTable = baseWeight.map(row => row.map(v => v * config.aiWeightScale));
+            function evaluate(board, player) {
+                const opp = player === BLACK ? WHITE : BLACK;
+                let score = 0;
+                for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                    if (board[r][c] === player) score += weightTable[r][c];
+                    else if (board[r][c] === opp) score -= weightTable[r][c];
+                }
+                let countP=0,countO=0;
+                for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                    if (board[r][c] === player) countP++;
+                    else if (board[r][c] === opp) countO++;
+                }
+                score += (countP - countO) * 1;
+                return score;
+            }
+            function minimax(board, depth, alpha, beta, isMaximizing, currentPlayer) {
+                if (depth === 0) return { score: evaluate(board, currentPlayer) };
+                const player = isMaximizing ? currentPlayer : (currentPlayer === BLACK ? WHITE : BLACK);
+                const moves = getValidMoves(board, player);
+                if (moves.length === 0) {
+                    if (checkGameOver(board, player)) return { score: evaluate(board, currentPlayer) * 5 };
+                    const nextPlayer = player === BLACK ? WHITE : BLACK;
+                    return minimax(board, depth-1, alpha, beta, !isMaximizing, currentPlayer);
+                }
+                let bestMove = moves[0];
+                if (isMaximizing) {
+                    let maxEval = -Infinity;
+                    for (let [r, c] of moves) {
+                        const newBoard = board.map(row => [...row]);
+                        makeMove(newBoard, r, c, player, true);
+                        const result = minimax(newBoard, depth-1, alpha, beta, false, currentPlayer);
+                        if (result.score > maxEval) { maxEval = result.score; bestMove = [r, c]; }
+                        alpha = Math.max(alpha, maxEval);
+                        if (beta <= alpha) break;
+                    }
+                    return { score: maxEval, move: bestMove };
+                } else {
+                    let minEval = Infinity;
+                    for (let [r, c] of moves) {
+                        const newBoard = board.map(row => [...row]);
+                        makeMove(newBoard, r, c, player, true);
+                        const result = minimax(newBoard, depth-1, alpha, beta, true, currentPlayer);
+                        if (result.score < minEval) { minEval = result.score; bestMove = [r, c]; }
+                        beta = Math.min(beta, minEval);
+                        if (beta <= alpha) break;
+                    }
+                    return { score: minEval, move: bestMove };
+                }
+            }
+            const result = minimax(board, config.aiDepth, -Infinity, Infinity, true, player);
+            return result.move || moves[0];
+        }
+
+        // ---------- 暴走模式 ----------
+        function applyRageEffect() {
+            if (!rageActive) return 0;
+            // 暴走：额外翻转一个最近的敌方棋子
+            let flipped = 0;
+            for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                if (board[r][c] === WHITE) {
+                    // 找最近的
+                    board[r][c] = BLACK;
+                    decorationMap[`${r},${c}`] = getRandomEmoji();
+                    flipped++;
+                    rageRemaining--;
+                    if (rageRemaining <= 0) rageActive = false;
+                    return flipped;
+                }
+            }
+            rageActive = false;
+            return flipped;
+        }
+
+        // ---------- 进度条更新 (含胜利倒计时) ----------
+        function updateProgress() {
+            const { black, white } = countScore(board);
+            const total = black + white;
+            if (total === 0) { 
+                progressFill.style.width = '12.5%'; 
+                progressLabel.textContent = '🌱 开局'; 
+                return; 
+            }
+            const ratio = black / total;
+            const pct = Math.max(8, Math.min(92, ratio * 100));
+            progressFill.style.width = pct + '%';
+
+            // 胜利倒计时和碾压提示
+            const victoryThreshold = CONFIG.VICTORY_THRESHOLD;
+            const dominationThreshold = CONFIG.DOMINATION_THRESHOLD;
+
+            if (ratio >= dominationThreshold) {
+                progressLabel.textContent = '👑 即将碾压！';
+                progressFill.className = 'progress-fill dominate';
+                progressWrap.className = 'progress-wrap dominate';
+                progressLabel.className = 'progress-label victory';
+                dominationGlow = true;
+                victoryGlow = true;
+                gameContainer.classList.add('dominate');
+                canvas.classList.add('victory-pulse');
+                document.body.classList.add('domination-glow');
+                if (!gameOver) {
+                    messageBox.className = 'message-box victory';
+                    messageBox.innerHTML = '👑 碾压在即！ AI 在颤抖...';
+                }
+            } else if (ratio >= victoryThreshold) {
+                progressLabel.textContent = '⚡ 胜利在望！';
+                progressFill.className = 'progress-fill victory';
+                progressWrap.className = 'progress-wrap victory';
+                progressLabel.className = 'progress-label victory';
+                victoryGlow = true;
+                dominationGlow = false;
+                gameContainer.classList.add('glow');
+                gameContainer.classList.remove('dominate');
+                canvas.classList.add('victory-pulse');
+                document.body.classList.add('victory-glow');
+                document.body.classList.remove('domination-glow');
+                if (!gameOver) {
+                    messageBox.className = 'message-box victory';
+                    messageBox.innerHTML = '⚡ 胜利在望！ 再下一城！';
+                }
+            } else {
+                progressFill.className = 'progress-fill';
+                progressWrap.className = 'progress-wrap';
+                progressLabel.className = 'progress-label';
+                victoryGlow = false;
+                dominationGlow = false;
+                gameContainer.classList.remove('glow', 'dominate');
+                canvas.classList.remove('victory-pulse');
+                document.body.classList.remove('victory-glow', 'domination-glow');
+                messageBox.className = 'message-box';
+                if (ratio < 0.35) progressLabel.textContent = '🌱 势均力敌';
+                else if (ratio < 0.55) progressLabel.textContent = '🌿 优势渐显';
+                else progressLabel.textContent = '⚡ 势如破竹';
+            }
+        }
+
+        // ---------- 浮动大字 ----------
+        function showFloat(text, isDominate = false) {
+            floatText.textContent = text;
+            floatText.className = 'float-text' + (isDominate ? ' dominate' : '');
+            floatText.classList.remove('show');
+            void floatText.offsetWidth;
+            floatText.classList.add('show');
+            setTimeout(() => { floatText.classList.remove('show'); }, 1500);
+        }
+
+        // ---------- 幸运事件 ----------
+        function triggerLuckyEvent() {
+            if (luckyUsed || gameOver) return;
+            const events = [
+                { name: '🌧️ 森林恩赐', action: () => {
+                    let empty = [];
+                    for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) if (board[r][c] === EMPTY) empty.push([r,c]);
+                    if (empty.length < 3) return false;
+                    for (let i=0; i<3; i++) {
+                        const idx = Math.floor(Math.random() * empty.length);
+                        const [r,c] = empty.splice(idx,1)[0];
+                        board[r][c] = BLACK;
+                        decorationMap[`${r},${c}`] = getRandomEmoji();
+                    }
+                    return true;
+                }},
+                { name: '🛡️ 荆棘护盾', action: () => {
+                    window.shieldActive = true;
+                    return true;
+                }},
+                { name: '🌟 星光指引', action: () => {
+                    const moves = getValidMoves(board, BLACK);
+                    if (moves.length === 0) return false;
+                    const [r,c] = moves[Math.floor(Math.random() * moves.length)];
+                    window.starHint = [r,c];
+                    return true;
+                }}
+            ];
+            const evt = events[Math.floor(Math.random() * events.length)];
+            luckyEvent = evt;
+            const ok = evt.action();
+            if (ok) {
+                luckyUsed = true;
+                showFloat('✨ ' + evt.name);
+                messageBox.innerHTML = '✨ 幸运事件: ' + evt.name;
+                drawBoard();
+                updateUI();
+                return true;
+            }
+            return false;
+        }
+
+        // ---------- 游戏流程 ----------
+        function handlePlayerMove(row, col) {
+            if (!gameStarted || gameOver || chainActive) return false;
+            if (currentPlayer !== BLACK) { messageBox.innerHTML = '⏳ 请等待AI思考...'; return false; }
+            const moves = getValidMoves(board, BLACK);
+            if (moves.length === 0) {
+                currentPlayer = WHITE;
+                updateUI(); drawBoard(); updateProgress();
+                messageBox.innerHTML = '⏭️ 你无步可走，AI走棋';
+                const config = getLevelConfig(currentLevel);
+                let delay = config.aiDelay;
+                if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                setTimeout(() => { aiTurn(); }, delay);
+                return false;
+            }
+            let valid = false;
+            for (let [r, c] of moves) { if (r === row && c === col) { valid = true; break; } }
+            if (!valid) { messageBox.innerHTML = '❌ 无效位置，请选择高亮区域'; return false; }
+
+            const flipped = makeMove(board, row, col, BLACK);
+
+            // 连击累计
+            if (flipped >= 3) {
+                consecutiveFlips++;
+                if (flipped >= 5) {
+                    showFloat(`🔥 ${flipped}连击! 屠杀！`, true);
+                    messageBox.innerHTML = `💀 ${flipped}连击！屠杀！`;
+                } else {
+                    showFloat(`💪 ${flipped}连击! 碾压！`);
+                    messageBox.innerHTML = `💪 ${flipped}连击！碾压！`;
+                }
+                // 暴走模式触发
+                if (consecutiveFlips >= CONFIG.RAGE_THRESHOLD && !rageActive) {
+                    rageActive = true;
+                    rageRemaining = CONFIG.RAGE_DURATION;
+                    showFloat('⚡ 暴走模式！', true);
+                    messageBox.innerHTML = '⚡ 暴走模式激活！持续 ' + CONFIG.RAGE_DURATION + ' 回合！';
+                }
+            } else {
+                consecutiveFlips = 0;
+            }
+
+            // 暴走额外翻转
+            if (rageActive) {
+                const extra = applyRageEffect();
+                if (extra > 0) {
+                    messageBox.innerHTML += ' 🔥 暴走+1';
+                }
+            }
+
+            // 技能检测
+            if (checkFullLine(board, BLACK) && !skillAvailable && !gameOver) {
+                skillAvailable = true;
+                skillBtn.disabled = false;
+                messageBox.innerHTML = '💥 技能已激活！点击"引爆"';
+                showSkillTip();
+            }
+
+            // 检查游戏结束
+            if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
+                gameOver = true;
+                updateUI(); drawBoard(); updateProgress();
+                showGameOver();
+                return true;
+            }
+
+            // 幸运事件
+            if (!luckyUsed && !gameOver && Math.random() < CONFIG.LUCKY_EVENT_RATE) {
+                triggerLuckyEvent();
+            }
+
+            // AI 减速（优势时）
+            const { black, white } = countScore(board);
+            const total = black + white;
+            const ratio = total > 0 ? black / total : 0;
+            aiSlowDown = ratio >= CONFIG.VICTORY_THRESHOLD;
+
+            currentPlayer = WHITE;
+            updateUI(); drawBoard(); updateProgress();
+            messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiSlowDown ? ' (AI 在颤抖)' : '');
+            turnText.innerText = 'AI 回合';
+            turnBadge.className = 'turn-badge white';
+            const config = getLevelConfig(currentLevel);
+            let delay = config.aiDelay;
+            if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+            setTimeout(() => { aiTurn(); }, delay);
+            return true;
+        }
+
+        // ---------- 连锁爆炸 ----------
+        function executeChainExplosion(row, col) {
+            if (chainActive) return;
+            chainActive = true;
+            let chainCount = 0;
+            let maxChain = 8;
+
+            function doChain() {
+                if (chainCount >= maxChain || gameOver) {
+                    chainActive = false;
+                    if (!gameOver) {
+                        currentPlayer = WHITE;
+                        updateUI(); drawBoard(); updateProgress();
+                        messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiSlowDown ? ' (AI 在颤抖)' : '');
+                        turnText.innerText = 'AI 回合';
+                        turnBadge.className = 'turn-badge white';
+                        const config = getLevelConfig(currentLevel);
+                        let delay = config.aiDelay;
+                        if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                        setTimeout(() => { aiTurn(); }, delay);
+                    }
+                    return;
+                }
+                const changed = triggerExplosion(row, col, BLACK);
+                chainCount++;
+                if (changed > 0) {
+                    showFloat(`💥 连锁×${chainCount}`, true);
+                    if (checkFullLine(board, BLACK) && !gameOver) {
+                        setTimeout(() => { if (!gameOver) doChain(); }, 350);
+                    } else {
+                        chainActive = false;
+                        if (!gameOver) {
+                            currentPlayer = WHITE;
+                            updateUI(); drawBoard(); updateProgress();
+                            messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiSlowDown ? ' (AI 在颤抖)' : '');
+                            turnText.innerText = 'AI 回合';
+                            turnBadge.className = 'turn-badge white';
+                            const config = getLevelConfig(currentLevel);
+                            let delay = config.aiDelay;
+                            if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                            setTimeout(() => { aiTurn(); }, delay);
+                        }
+                    }
+                } else {
+                    chainActive = false;
+                    if (!gameOver) {
+                        currentPlayer = WHITE;
+                        updateUI(); drawBoard(); updateProgress();
+                        messageBox.innerHTML = '🤖 AI 思考中 ...' + (aiSlowDown ? ' (AI 在颤抖)' : '');
+                        turnText.innerText = 'AI 回合';
+                        turnBadge.className = 'turn-badge white';
+                        const config = getLevelConfig(currentLevel);
+                        let delay = config.aiDelay;
+                        if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                        setTimeout(() => { aiTurn(); }, delay);
+                    }
+                }
+                drawBoard();
+                updateUI();
+                updateProgress();
+                if (checkGameOver(board, WHITE) || checkGameOver(board, BLACK)) {
+                    gameOver = true;
+                    chainActive = false;
+                    drawBoard();
+                    showGameOver();
+                }
+            }
+            doChain();
+        }
+
+        function aiTurn() {
+            if (!gameStarted || gameOver || chainActive) return;
+            if (currentPlayer !== WHITE) return;
+
+            if (window.shieldActive) {
+                window.shieldActive = false;
+                currentPlayer = BLACK;
+                updateUI(); drawBoard(); updateProgress();
+                messageBox.innerHTML = '🛡️ 荆棘护盾！AI 跳过回合';
+                turnText.innerText = '你的回合';
+                turnBadge.className = 'turn-badge black';
+                return;
+            }
+
+            const moves = getValidMoves(board, WHITE);
+            if (moves.length === 0) {
+                currentPlayer = BLACK;
+                updateUI(); drawBoard(); updateProgress();
+                if (checkGameOver(board, BLACK)) { gameOver = true; showGameOver(); }
+                else { messageBox.innerHTML = '⏭️ AI 无步可走，轮到你'; turnText.innerText = '你的回合'; turnBadge.className = 'turn-badge black'; }
+                return;
+            }
+            const move = aiMove(board, WHITE);
+            if (!move) { currentPlayer = BLACK; updateUI(); return; }
+            const [row, col] = move;
+            makeMove(board, row, col, WHITE);
+            if (checkGameOver(board, BLACK) || checkGameOver(board, WHITE)) {
+                gameOver = true;
+                updateUI(); drawBoard(); updateProgress();
+                showGameOver();
+                return;
+            }
+            currentPlayer = BLACK;
+            updateUI(); drawBoard(); updateProgress();
+            messageBox.innerHTML = '🌳 你的回合 (棕色)';
+            turnText.innerText = '你的回合';
+            turnBadge.className = 'turn-badge black';
+            const playerMoves = getValidMoves(board, BLACK);
+            if (playerMoves.length === 0) {
+                currentPlayer = WHITE;
+                updateUI(); drawBoard(); updateProgress();
+                messageBox.innerHTML = '⏭️ 你无步可走，AI走棋';
+                turnText.innerText = 'AI 回合';
+                turnBadge.className = 'turn-badge white';
+                const config = getLevelConfig(currentLevel);
+                let delay = config.aiDelay;
+                if (aiSlowDown) delay *= CONFIG.AI_SLOW_DOWN;
+                setTimeout(() => { aiTurn(); }, delay);
+            }
+        }
+
+        // ---------- UI ----------
+        function showSkillTip() {
+            skillTip.classList.add('show');
+            setTimeout(() => skillTip.classList.remove('show'), 2500);
+        }
+
+        function onSkillClick() {
+            if (!gameStarted || gameOver || chainActive) return;
+            if (!skillAvailable) { messageBox.innerHTML = '⚠️ 暂无技能，请先填满一行或一列'; return; }
+            if (currentPlayer !== BLACK) { messageBox.innerHTML = '⏳ 请在你的回合使用技能'; return; }
+            skillTriggered = true;
+            messageBox.innerHTML = '💥 点击棋盘选择爆炸中心 (连锁爆炸!)';
+            skillBtn.disabled = true;
+            const handler = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const mouseX = (e.clientX - rect.left) * scaleX;
+                const mouseY = (e.clientY - rect.top) * scaleY;
+                const cellSize = 500 / SIZE;
+                const col = Math.floor(mouseX / cellSize);
+                const row = Math.floor(mouseY / cellSize);
+                if (row >= 0 && row < SIZE && col >= 0 && col < SIZE) {
+                    skillAvailable = false;
+                    skillTriggered = false;
+                    skillBtn.disabled = true;
+                    canvas.removeEventListener('click', handler);
+                    executeChainExplosion(row, col);
+                } else {
+                    messageBox.innerHTML = '❌ 请点击棋盘内部';
+                }
+            };
+            canvas.addEventListener('click', handler);
+        }
+
+        function showGameOver() {
+            const { black, white } = countScore(board);
+            let msg = '', won = false;
+            if (black > white) { msg = '🏆 你赢了！ 森林之王！'; won = true; }
+            else if (white > black) { msg = '🤖 AI 获胜！ 再来一局？'; }
+            else { msg = '🤝 平局！ 旗鼓相当！'; }
+            messageBox.innerHTML = `🏁 游戏结束 · ${msg}  (棕色 ${black} · 绿色 ${white})`;
+            turnText.innerText = '已结束';
+            turnBadge.className = 'turn-badge';
+            skillBtn.disabled = true;
+            if (currentLevel === 1 && won) {
+                level2Unlocked = true; level2Btn.disabled = false;
+                messageBox.innerHTML += ' 🌟 第二关已解锁！即将自动进入...';
+                setTimeout(() => { if (currentLevel === 1) { initLevel(2); messageBox.innerHTML = '🔥 第二关: 标准难度，认真对战！'; } }, 1500);
+            }
+            if (currentLevel === 2 && won) messageBox.innerHTML += ' 🎉 你通关了所有关卡！太棒啦！';
+            // 终局特效：胜利时金光更亮
+            if (won) {
+                gameContainer.classList.add('dominate');
+                canvas.classList.add('victory-pulse');
+                document.body.classList.add('domination-glow');
+            }
+        }
+
+        function updateUI() {
+            const { black, white } = countScore(board);
+            blackScoreSpan.innerText = black;
+            whiteScoreSpan.innerText = white;
+            if (!gameOver && gameStarted) {
+                if (currentPlayer === BLACK) { turnText.innerText = '你的回合'; turnBadge.className = 'turn-badge black'; }
+                else { turnText.innerText = 'AI 回合'; turnBadge.className = 'turn-badge white'; }
+            }
+            if (skillAvailable && !skillTriggered && !gameOver && currentPlayer === BLACK && !chainActive) {
+                skillBtn.disabled = false;
+            } else {
+                skillBtn.disabled = true;
+            }
+            updateProgress();
+        }
+
+        // ---------- 绘制 ----------
+        function drawBoard() {
+            const size = 500;
+            const cellSize = size / SIZE;
+            ctx.clearRect(0, 0, size, size);
+            ctx.fillStyle = '#d9b382';
+            ctx.fillRect(0, 0, size, size);
+            ctx.strokeStyle = '#8b6b4a';
+            ctx.lineWidth = 1.8;
+            for (let i=0; i<=SIZE; i++) {
+                ctx.beginPath(); ctx.moveTo(i*cellSize, 0); ctx.lineTo(i*cellSize, size); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i*cellSize); ctx.lineTo(size, i*cellSize); ctx.stroke();
+            }
+            let starPos = null;
+            if (window.starHint) { starPos = window.starHint; window.starHint = null; }
+            for (let r=0; r<SIZE; r++) for (let c=0; c<SIZE; c++) {
+                const val = board[r][c];
+                if (val === EMPTY) continue;
+                const x = c * cellSize + 4, y = r * cellSize + 4, w = cellSize - 8, h = cellSize - 8;
+                ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8;
+                if (val === BLACK) ctx.fillStyle = '#6b4a2e'; else ctx.fillStyle = '#5b7a4a';
+                ctx.fillRect(x, y, w, h);
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = val === BLACK ? '#4d351e' : '#3b5a2a';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(x, y, w, h);
+                const key = `${r},${c}`;
+                let emoji = decorationMap[key] || getRandomEmoji();
+                if (!decorationMap[key]) decorationMap[key] = emoji;
+                ctx.font = `${cellSize * 0.55}px "Segoe UI Emoji", "Apple Color Emoji", system-ui, sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.2)';
+                ctx.fillStyle = '#1f2f1a';
+                ctx.fillText(emoji, x + w/2, y + h/2 + 2);
+                ctx.shadowBlur = 0;
+                // 脉动发光（优势时）
+                if (victoryGlow && val === BLACK) {
+                    ctx.shadowColor = 'rgba(255, 215, 0, 0.3)';
+                    ctx.shadowBlur = 15;
+                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x-2, y-2, w+4, h+4);
+                    ctx.shadowBlur = 0;
+                }
+            }
+            if (!gameOver && gameStarted && currentPlayer === BLACK && !skillTriggered && !chainActive) {
+                const moves = getValidMoves(board, BLACK);
+                for (let [r, c] of moves) {
+                    const x = c * cellSize + cellSize/2, y = r * cellSize + cellSize/2;
+                    ctx.beginPath(); ctx.arc(x, y, cellSize*0.18, 0, 2*Math.PI);
+                    ctx.fillStyle = 'rgba(255, 240, 180, 0.7)';
+                    ctx.shadowBlur = 12; ctx.shadowColor = '#f5e68a';
+                    ctx.fill(); ctx.shadowBlur = 0;
+                }
+            }
+            if (starPos) {
+                const [r,c] = starPos;
+                const x = c * cellSize + cellSize/2, y = r * cellSize + cellSize/2;
+                ctx.beginPath(); ctx.arc(x, y, cellSize*0.4, 0, 2*Math.PI);
+                ctx.fillStyle = 'rgba(255, 255, 200, 0.3)';
+                ctx.shadowBlur = 50; ctx.shadowColor = '#f5e68a';
+                ctx.fill(); ctx.shadowBlur = 0;
+                ctx.strokeStyle = '#f5e68a'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(x, y, cellSize*0.4, 0, 2*Math.PI);
+                ctx.stroke();
+            }
+        }
+
+        // ---------- 事件绑定 ----------
+        canvas.addEventListener('click', (e) => {
+            if (skillTriggered || chainActive) return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+            const cellSize = 500 / SIZE;
+            const col = Math.floor(mouseX / cellSize);
+            const row = Math.floor(mouseY / cellSize);
+            if (row >= 0 && row < SIZE && col >= 0 && col < SIZE) {
+                handlePlayerMove(row, col);
+            }
+        });
+
+        skillBtn.addEventListener('click', onSkillClick);
+
+        level1Btn.addEventListener('click', () => {
+            if (currentLevel === 1) return;
+            if (confirm('切换到第一关？当前对局将重新开始。')) initLevel(1);
+        });
+        level2Btn.addEventListener('click', () => {
+            if (currentLevel === 2) return;
+            if (!level2Unlocked) { messageBox.innerHTML = '🔒 第二关未解锁！请先通关第一关！'; return; }
+            if (confirm('切换到第二关？当前对局将重新开始。')) initLevel(2);
+        });
+        resetBtn.addEventListener('click', () => {
+            if (confirm('重新开始当前关卡？')) initLevel(currentLevel);
+        });
+
+        // 启动
+        level2Unlocked = false;
+        level2Btn.disabled = true;
+        initLevel(1);
+    })();
+</script>
+</body>
+</html>
